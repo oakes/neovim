@@ -329,17 +329,27 @@ bool channel_close(uint64_t id)
   return true;
 }
 
-/// Creates an API channel from stdin/stdout. This is used when embedding
-/// Neovim
-void channel_from_stdio(void)
+/// Creates an API channel from file descriptors
+///
+/// @param read_fd The file descriptor for reading
+/// @param write_fd The file descriptor for writing
+uint64_t channel_from_fds(uv_file read_fd, uv_file write_fd)
 {
   Channel *channel = register_channel(kChannelTypeStdio, 0, NULL);
   incref(channel);  // stdio channels are only closed on exit
   // read stream
-  rstream_init_fd(&main_loop, &channel->data.std.in, 0, CHANNEL_BUFFER_SIZE);
+  rstream_init_fd(&main_loop, &channel->data.std.in, read_fd, CHANNEL_BUFFER_SIZE);
   rstream_start(&channel->data.std.in, receive_msgpack, channel);
   // write stream
-  wstream_init_fd(&main_loop, &channel->data.std.out, 1, 0);
+  wstream_init_fd(&main_loop, &channel->data.std.out, write_fd, 0);
+  return channel->id;
+}
+
+/// Creates an API channel from stdin/stdout. This is used when embedding
+/// Neovim
+void channel_from_stdio(void)
+{
+  channel_from_fds(0, 1);
 }
 
 /// Creates a loopback channel. This is used to avoid deadlock
